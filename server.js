@@ -91,14 +91,16 @@ function generateLocalMock(resumeText) {
   };
 
   lines.forEach(line => {
-    const lineLower = line.toLowerCase();
-    if (lineLower.includes('summary') || lineLower.includes('objective') || lineLower.includes('profile')) {
+    const cleanLine = line.trim().toLowerCase();
+    
+    // Strict section header matching
+    if (/^(summary|objective|profile|professional summary|about me)$/i.test(cleanLine)) {
       currentSection = "summary";
-    } else if (lineLower.includes('experience') || lineLower.includes('employment') || lineLower.includes('work history') || lineLower.includes('professional history')) {
+    } else if (/^(experience|employment|work history|professional history|professional experience|experience history)$/i.test(cleanLine)) {
       currentSection = "experience";
-    } else if (lineLower.includes('education') || lineLower.includes('academic') || lineLower.includes('university') || lineLower.includes('college')) {
+    } else if (/^(education|academic history|academic credentials|education history|credentials)$/i.test(cleanLine)) {
       currentSection = "education";
-    } else if (lineLower.includes('skills') || lineLower.includes('technologies') || lineLower.includes('competencies')) {
+    } else if (/^(skills|technologies|competencies|technical skills|skills & expertise)$/i.test(cleanLine)) {
       currentSection = "skills";
     } else {
       if (currentSection !== "header") {
@@ -114,15 +116,16 @@ function generateLocalMock(resumeText) {
     summary = "Career telemetry scanned and registered locally.";
   }
 
-  // 2. Process Skills
+  // 2. Process Skills (Faithfully join wrapped lines first, then split on commas)
   if (sectionText.skills.length > 0) {
-    sectionText.skills.forEach(line => {
-      const parts = line.split(/[•,·|;\t]/).map(p => p.trim()).filter(p => p.length > 1);
-      parts.forEach(part => {
-        if (part.length < 30) {
-          skills.push(part);
-        }
-      });
+    const fullSkillsText = sectionText.skills.join(' ');
+    // Split by commas or bullet marks (•, ·, |)
+    const parts = fullSkillsText.split(/[•·|,\t]/).map(p => p.trim()).filter(p => p.length > 1);
+    parts.forEach(part => {
+      const cleanPart = part.replace(/\.$/, '').trim();
+      if (cleanPart.length < 50 && cleanPart.length > 0) {
+        skills.push(cleanPart);
+      }
     });
   }
   // Fallback: search for keywords if skills block was empty or not parsed well
@@ -141,33 +144,109 @@ function generateLocalMock(resumeText) {
 
   // 3. Process Experience (faithful extraction)
   if (sectionText.experience.length > 0) {
-    for (let i = 0; i < sectionText.experience.length; i += 3) {
-      const roleLine = sectionText.experience[i] || "";
-      const companyLine = sectionText.experience[i+1] || "";
-      const descLine = sectionText.experience[i+2] || "";
-      if (roleLine.trim().length > 0) {
-        experience.push({
-          role: roleLine,
-          company: companyLine || "Not specified",
-          duration: "Telemetry record",
-          description: descLine || "System logged description"
-        });
+    let currentJob = null;
+    
+    sectionText.experience.forEach(line => {
+      const cleanLine = line.trim();
+      if (cleanLine.length === 0) return;
+      
+      const dateMatch = cleanLine.match(/(\d{4}\s*-\s*\d{4})|(\d{4}\s*-\s*Present)/i);
+      
+      // Strict header checks:
+      // A line is a header if it contains a date range OR if it is a short line containing a strong divider ( - , | , – , — ) and does NOT look like a bullet description
+      const hasStrongDivider = cleanLine.includes(' - ') || cleanLine.includes(' | ') || cleanLine.includes(' – ') || cleanLine.includes(' — ');
+      const isHeader = dateMatch || (hasStrongDivider && cleanLine.length < 80 && !cleanLine.startsWith('•') && !cleanLine.startsWith('-') && !cleanLine.startsWith('*'));
+      
+      if (isHeader) {
+        if (currentJob) {
+          experience.push(currentJob);
+        }
+        
+        let role = cleanLine;
+        let company = "Not specified";
+        let duration = "Telemetry record";
+        
+        if (dateMatch) {
+          duration = dateMatch[0];
+          role = cleanLine.replace(dateMatch[0], '').replace(/[()]/g, '').trim();
+        }
+        
+        // Split role and company using strong dividers
+        let divider = ' - ';
+        if (role.includes(' | ')) divider = ' | ';
+        else if (role.includes(' – ')) divider = ' – ';
+        else if (role.includes(' — ')) divider = ' — ';
+        
+        const parts = role.split(divider);
+        if (parts.length > 1) {
+          role = parts[0].trim();
+          company = parts.slice(1).join(divider).trim();
+        }
+        
+        currentJob = {
+          role: role,
+          company: company,
+          duration: duration,
+          description: ""
+        };
+      } else {
+        if (currentJob) {
+          if (currentJob.description) {
+            currentJob.description += " " + cleanLine;
+          } else {
+            currentJob.description = cleanLine;
+          }
+        } else {
+          currentJob = {
+            role: "Experience Entry",
+            company: "Starfleet Registry",
+            duration: "Telemetry record",
+            description: cleanLine
+          };
+        }
       }
+    });
+    
+    if (currentJob) {
+      experience.push(currentJob);
     }
   }
 
   // 4. Process Education (faithful extraction)
   if (sectionText.education.length > 0) {
-    for (let i = 0; i < sectionText.education.length; i += 2) {
-      const degreeLine = sectionText.education[i] || "";
-      const schoolLine = sectionText.education[i+1] || "";
-      if (degreeLine.trim().length > 0) {
-        education.push({
-          degree: degreeLine,
-          school: schoolLine || "Not specified",
-          year: "Academic telemetry"
-        });
+    let currentEdu = null;
+    sectionText.education.forEach(line => {
+      const cleanLine = line.trim();
+      if (cleanLine.length === 0) return;
+      
+      const dateMatch = cleanLine.match(/(\d{4}\s*-\s*\d{4})/);
+      
+      if (dateMatch || cleanLine.length < 100) {
+        if (currentEdu) {
+          education.push(currentEdu);
+        }
+        
+        let degree = cleanLine;
+        let year = "Academic telemetry";
+        
+        if (dateMatch) {
+          year = dateMatch[0];
+          degree = cleanLine.replace(dateMatch[0], '').replace(/[()]/g, '').trim();
+        }
+        
+        currentEdu = {
+          degree: degree,
+          school: "Not specified",
+          year: year
+        };
+      } else {
+        if (currentEdu) {
+          currentEdu.school = cleanLine;
+        }
       }
+    });
+    if (currentEdu) {
+      education.push(currentEdu);
     }
   }
 
@@ -178,10 +257,10 @@ function generateLocalMock(resumeText) {
     domain = "tactical";
   } else if (textLower.includes('science') || textLower.includes('research') || textLower.includes('doctor') || textLower.includes('medical') || textLower.includes('physics') || textLower.includes('biology')) {
     domain = "sciences";
-  } else if (textLower.includes('manage') || textLower.includes('lead') || textLower.includes('director') || textLower.includes('executive') || textLower.includes('president')) {
-    domain = "command";
   } else if (textLower.includes('code') || textLower.includes('software') || textLower.includes('developer') || textLower.includes('engineer') || textLower.includes('programming')) {
     domain = "engineering";
+  } else if (textLower.includes('manage') || textLower.includes('lead') || textLower.includes('director') || textLower.includes('executive') || textLower.includes('president')) {
+    domain = "command";
   }
 
   // Fictional Job recommendations bank based on domain
