@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Enterprise Computer Core - Personnel Diagnostics</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <!-- Inter for body and numbers, Orbitron for futuristic headers, JetBrains Mono for data/JSON -->
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;700&family=Orbitron:wght@500;700;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  
+  <!-- Subtle Background Grid/Glow -->
+  <div class="space-background">
+    <div class="grid-overlay"></div>
+    <div class="glow-orb"></div>
+  </div>
+
+  <div class="app-container">
+    
+    <!-- Modern Minimal Header -->
+    <header class="app-header">
+      <div class="header-logo">
+        <span class="logo-symbol">✦</span>
+        <h1>ENTERPRISE <span class="muted">//</span> COMPUTER CORE</h1>
+      </div>
+      
+      <!-- Telemetry Info -->
+      <div class="header-telemetry">
+        <div class="telemetry-badge">
+          <span class="status-dot green"></span>
+          <span class="badge-text">LINK ACTIVE</span>
+        </div>
+        <div class="telemetry-badge">
+          <span class="status-dot blue"></span>
+          <span class="badge-text">DIAGNOSTICS: STANDBY</span>
+        </div>
+        <div class="stardate-pill" id="stardate-display">STARDATE: 80646.4</div>
+      </div>
+    </header>
+
+    <!-- Main Container -->
+    <main class="main-content">
+      
+      <!-- View 1: Upload View -->
+      <section id="upload-view" class="view-panel active">
+        <div class="content-card">
+          <div class="card-header">
+            <h2>Personnel Diagnostic Core</h2>
+            <p class="card-subtitle">Feed career telemetry into the ship systems to determine optimal deck reassignment.</p>
+          </div>
+
+          <!-- Drag and Drop Upload Zone -->
+          <div class="upload-zone" id="drop-zone">
+            <div class="upload-icon-container">
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="upload-svg">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M12 16.5V9.75m0 0l3 3m-3-3l-3 3M6.75 19.5a4.5 4.5 0 01-1.41-8.775 5.25 5.25 0 0110.233-2.33 3 3 0 013.758 3.848A3.752 3.752 0 0118 19.5H6.75z" />
+              </svg>
+            </div>
+            <div class="upload-text-content">
+              <p class="upload-primary-text">Drag & drop your resume PDF here, or <span class="highlight">browse files</span></p>
+              <p class="upload-secondary-text">Standard Starfleet career format (Max size: 10MB)</p>
+            </div>
+            <!-- Completely hidden file input to avoid browser-default overlapping button -->
+            <input type="file" id="resume-file" accept="application/pdf" style="display: none;">
+          </div>
+
+          <!-- File Selected Attachment Indicator (Hidden Initially) -->
+          <div id="file-info-container" class="attachment-pill hidden">
+            <div class="attachment-left">
+              <span class="attachment-icon">📄</span>
+              <span id="file-name-label" class="attachment-name">resume.pdf</span>
+              <span id="file-size-label" class="attachment-size">(124 KB)</span>
+            </div>
+            <button id="remove-file-btn" class="attachment-remove-btn" title="Remove File">
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="remove-svg">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+
+          <!-- Actions -->
+          <div class="actions-bar">
+            <button id="demo-btn" class="btn btn-secondary">
+              RUN SYSTEM SIMULATION
+            </button>
+            <button id="analyze-btn" class="btn btn-primary disabled" disabled>
+              INITIATE DIAGNOSTICS
+            </button>
+          </div>
+        </div>
+      </section>
+
+      <!-- View 2: Loading / Analyzing View -->
+      <section id="loading-view" class="view-panel">
+        <div class="content-card loading-card">
+          <!-- Sleek Minimal Spinner -->
+          <div class="telemetry-spinner">
+            <div class="spinner-ring ring-1"></div>
+            <div class="spinner-ring ring-2"></div>
+            <div class="spinner-core"></div>
+          </div>
+          
+          <div class="loading-text-container">
+            <h3 id="loading-title">CALIBRATING DATABASE LINK</h3>
+            <p id="loading-log" class="telemetry-log">Establishing secure sub-space connection...</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- View 3: Results View -->
+      <section id="results-view" class="view-panel">
+        
+        <!-- Segmented Tab Controller -->
+        <div class="segmented-tabs">
+          <button class="tab-btn active" data-tab="tab-json">
+            <span>01 // Telemetry JSON</span>
+          </button>
+          <button class="tab-btn" data-tab="tab-jobs">
+            <span>02 // Fictional Assignments</span>
+          </button>
+        </div>
+
+        <!-- Tab 1: JSON File -->
+        <div id="tab-json" class="tab-content active">
+          <div class="content-card">
+            <div class="tab-header">
+              <h3>Personnel Database Record</h3>
+              <p class="tab-subtitle">Parsed profile credentials mapped into standardized database metrics.</p>
+            </div>
+            
+            <div class="code-container">
+              <div class="code-header">
+                <span class="telemetry-label">telemetry_record.json</span>
+                <button id="copy-json-btn" class="btn-copy">
+                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="copy-svg">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 17.25v3.375c0 .621-.504 1.125-1.125 1.125h-9.75a1.125 1.125 0 01-1.125-1.125V7.875c0-.621.504-1.125 1.125-1.125H5.25m1.5-1.5-1.5 1.5M21 3v11.25c0 .621-.504 1.125-1.125 1.125H9.75a1.125 1.125 0 01-1.125-1.125V3c0-.621.504-1.125 1.125-1.125h9.75c.621 0 1.125.504 1.125 1.125z" />
+                  </svg>
+                  <span>Copy JSON</span>
+                </button>
+              </div>
+              <pre class="code-box"><code id="json-code-display">Loading telemetry data...</code></pre>
+            </div>
+          </div>
+        </div>
+
+        <!-- Tab 2: Star Trek Enterprise Job list -->
+        <div id="tab-jobs" class="tab-content">
+          <div class="content-card">
+            <div class="tab-header">
+              <h3>flagship deck reassignments</h3>
+              <p class="tab-subtitle">Recommended tactical and engineering assignments aboard U.S.S. Enterprise.</p>
+            </div>
+            
+            <div class="jobs-grid" id="jobs-grid-container">
+              <!-- Dynamically Populated Job Cards -->
+            </div>
+          </div>
+        </div>
+
+        <!-- Sticky Footer Reset Action -->
+        <div class="results-actions">
+          <button id="reset-btn" class="btn btn-secondary">
+            RUN NEW DIAGNOSTICS
+          </button>
+        </div>
+      </section>
+
+    </main>
+
+    <footer class="app-footer">
+      <div class="footer-telemetry">SYS_LOC: DECK 8 // CORE STATUS: STABLE</div>
+      <div class="footer-copyright">LCARS INTERACTION CORE // CLASSIFIED DIRECTIVES</div>
+    </footer>
+
+  </div>
+
+  <script src="script.js"></script>
+</body>
+</html>
