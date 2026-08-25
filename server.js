@@ -18,13 +18,16 @@ app.use(express.static(path.join(__dirname, 'public')));
 app.use(express.json());
 
 // Initialize Google Gen AI SDK safely
-const project = process.env.GCP_PROJECT || 'poetic-harmony-436119-q7';
+const project = process.env.GCP_PROJECT;
 const location = process.env.GCP_LOCATION || 'us-central1';
-const useVertex = process.env.USE_VERTEX === 'true' || (!process.env.GEMINI_API_KEY && !!project);
+const apiKey = process.env.GEMINI_API_KEY;
 
 let ai = null;
 try {
-  if (useVertex) {
+  if (apiKey) {
+    ai = new GoogleGenAI({ apiKey });
+    console.log('Initialized Google Gen AI SDK with API Key');
+  } else if (project) {
     ai = new GoogleGenAI({
       vertexai: true,
       project,
@@ -32,10 +35,7 @@ try {
     });
     console.log(`Initialized Vertex AI SDK with project: ${project}, location: ${location}`);
   } else {
-    ai = new GoogleGenAI({
-      apiKey: process.env.GEMINI_API_KEY
-    });
-    console.log('Initialized Google Gen AI SDK with API Key');
+    console.log('No Google Gen AI credentials provided in environment variables. Defaulting to Local Telemetry Mode (Offline Fallback).');
   }
 } catch (initError) {
   console.warn('Google Gen AI SDK initialization failed. Will default to local diagnostics core:', initError.message);
@@ -49,28 +49,130 @@ function generateLocalMock(resumeText) {
   let name = "Unknown Candidate";
   if (lines.length > 0) {
     const candidateName = lines[0];
-    if (candidateName.length < 50 && !candidateName.includes(':')) {
+    if (candidateName.length < 50 && !candidateName.includes(':') && !candidateName.includes('@')) {
       name = candidateName;
     }
   }
   
   // Extract Email
-  let email = "telemetry.candidate@starfleet.net";
+  let email = null;
   const emailMatch = resumeText.match(/[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/);
   if (emailMatch) {
     email = emailMatch[0];
   }
   
   // Extract Phone
-  let phone = "Not detected";
+  let phone = null;
   const phoneMatch = resumeText.match(/(\+?\d{1,3}[-.\s]?)?\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}/);
   if (phoneMatch) {
     phone = phoneMatch[0];
   }
   
+  // Extract Location (search for common state patterns or city, state)
+  let locationVal = null;
+  const locationMatch = resumeText.match(/[a-zA-Z\s]{2,20},\s[A-Z]{2}/);
+  if (locationMatch) {
+    locationVal = locationMatch[0];
+  }
+
+  // Parse Sections
+  let summary = "";
+  const experience = [];
+  const education = [];
+  const skills = [];
+
+  // Segment sections
+  let currentSection = "header";
+  let sectionText = {
+    summary: [],
+    experience: [],
+    education: [],
+    skills: []
+  };
+
+  lines.forEach(line => {
+    const lineLower = line.toLowerCase();
+    if (lineLower.includes('summary') || lineLower.includes('objective') || lineLower.includes('profile')) {
+      currentSection = "summary";
+    } else if (lineLower.includes('experience') || lineLower.includes('employment') || lineLower.includes('work history') || lineLower.includes('professional history')) {
+      currentSection = "experience";
+    } else if (lineLower.includes('education') || lineLower.includes('academic') || lineLower.includes('university') || lineLower.includes('college')) {
+      currentSection = "education";
+    } else if (lineLower.includes('skills') || lineLower.includes('technologies') || lineLower.includes('competencies')) {
+      currentSection = "skills";
+    } else {
+      if (currentSection !== "header") {
+        sectionText[currentSection].push(line);
+      }
+    }
+  });
+
+  // 1. Process Summary
+  if (sectionText.summary.length > 0) {
+    summary = sectionText.summary.slice(0, 3).join(' ');
+  } else {
+    summary = "Career telemetry scanned and registered locally.";
+  }
+
+  // 2. Process Skills
+  if (sectionText.skills.length > 0) {
+    sectionText.skills.forEach(line => {
+      const parts = line.split(/[•,·|;\t]/).map(p => p.trim()).filter(p => p.length > 1);
+      parts.forEach(part => {
+        if (part.length < 30) {
+          skills.push(part);
+        }
+      });
+    });
+  }
+  // Fallback: search for keywords if skills block was empty or not parsed well
+  if (skills.length === 0) {
+    const commonSkills = [
+      'javascript', 'python', 'java', 'react', 'node', 'sql', 'docker', 'aws', 'gcp', 'kubernetes',
+      'management', 'leadership', 'communication', 'sales', 'marketing', 'design', 'research',
+      'c++', 'c#', 'git', 'excel'
+    ];
+    commonSkills.forEach(s => {
+      if (resumeText.toLowerCase().includes(s)) {
+        skills.push(s.split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' '));
+      }
+    });
+  }
+
+  // 3. Process Experience (faithful extraction)
+  if (sectionText.experience.length > 0) {
+    for (let i = 0; i < sectionText.experience.length; i += 3) {
+      const roleLine = sectionText.experience[i] || "";
+      const companyLine = sectionText.experience[i+1] || "";
+      const descLine = sectionText.experience[i+2] || "";
+      if (roleLine.trim().length > 0) {
+        experience.push({
+          role: roleLine,
+          company: companyLine || "Not specified",
+          duration: "Telemetry record",
+          description: descLine || "System logged description"
+        });
+      }
+    }
+  }
+
+  // 4. Process Education (faithful extraction)
+  if (sectionText.education.length > 0) {
+    for (let i = 0; i < sectionText.education.length; i += 2) {
+      const degreeLine = sectionText.education[i] || "";
+      const schoolLine = sectionText.education[i+1] || "";
+      if (degreeLine.trim().length > 0) {
+        education.push({
+          degree: degreeLine,
+          school: schoolLine || "Not specified",
+          year: "Academic telemetry"
+        });
+      }
+    }
+  }
+
+  // Detect domain for Star Trek matching
   const textLower = resumeText.toLowerCase();
-  
-  // Detect domain
   let domain = "operations";
   if (textLower.includes('security') || textLower.includes('defense') || textLower.includes('military') || textLower.includes('police') || textLower.includes('cyber')) {
     domain = "tactical";
@@ -81,31 +183,16 @@ function generateLocalMock(resumeText) {
   } else if (textLower.includes('code') || textLower.includes('software') || textLower.includes('developer') || textLower.includes('engineer') || textLower.includes('programming')) {
     domain = "engineering";
   }
-  
-  // Gather some skills from the text
-  const commonSkills = [
-    'javascript', 'python', 'java', 'react', 'node', 'sql', 'docker', 'aws', 'gcp', 'kubernetes',
-    'management', 'leadership', 'communication', 'sales', 'marketing', 'design', 'research',
-    'analytical', 'problem solving', 'security', 'c++', 'c#', 'agile', 'git', 'excel'
-  ];
-  const detectedSkills = [];
-  commonSkills.forEach(s => {
-    if (textLower.includes(s)) {
-      detectedSkills.push(s.split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' '));
-    }
-  });
-  if (detectedSkills.length === 0) {
-    detectedSkills.push('General Telemetry Analysis', 'Systems Troubleshooting');
-  }
 
   // Fictional Job recommendations bank based on domain
   let jobs = [];
+  const topSkillsStr = skills.slice(0, 3).join(', ') || "Systems Management";
   if (domain === "engineering") {
     jobs = [
       {
         title: "Chief Replicator Culinary Subroutine Programmer",
         department: "Engineering",
-        why_matched: `Based on your technical background and software experience (${detectedSkills.slice(0, 3).join(', ')}), the ship needs you to program the food replicators. Specifically, we require someone to debug the Earl Grey tea formulation and ensure the chocolate sundaes match Counselor Troi's exact specifications.`,
+        why_matched: `Based on your technical background and software experience (${topSkillsStr}), the ship needs you to program the food replicators. Specifically, we require someone to debug the Earl Grey tea formulation and ensure the chocolate sundaes match Counselor Troi's exact specifications.`,
         compatibility_rating: "96%"
       },
       {
@@ -126,7 +213,7 @@ function generateLocalMock(resumeText) {
       {
         title: "Astrophysical Anomaly Data Cartographer",
         department: "Sciences",
-        why_matched: `With your analytical skills (${detectedSkills.slice(0, 3).join(', ')}), you will parse telemetry from stellar nurseries, black holes, and spatial rifts. Your maps will ensure the Enterprise doesn't get pulled into a temporal loop.`,
+        why_matched: `With your analytical skills (${topSkillsStr}), you will parse telemetry from stellar nurseries, black holes, and spatial rifts. Your maps will ensure the Enterprise doesn't get pulled into a temporal loop.`,
         compatibility_rating: "94%"
       },
       {
@@ -168,7 +255,7 @@ function generateLocalMock(resumeText) {
       {
         title: "Diplomatic Protocol Subspace Liaison",
         department: "Command",
-        why_matched: `Your leadership and management credentials (${detectedSkills.slice(0, 3).join(', ')}) are ideal for coordinating communications during delicate peace treaties. You will brief Captain Picard on cultural customs to avoid starting intergalactic wars.`,
+        why_matched: `Your leadership and management credentials (${topSkillsStr}) are ideal for coordinating communications during delicate peace treaties. You will brief Captain Picard on cultural customs to avoid starting intergalactic wars.`,
         compatibility_rating: "93%"
       },
       {
@@ -206,32 +293,23 @@ function generateLocalMock(resumeText) {
       }
     ];
   }
-  
+
   return {
+    telemetry_meta: {
+      mode: "Local Basic Parser (Offline Fallback)",
+      notice: "Google Gen AI API is not configured or offline. Running basic keyword heuristics diagnostics."
+    },
     resume_json: {
       name: name,
       contact: {
         email: email,
         phone: phone,
-        location: "Federation Telemetry Link"
+        location: locationVal
       },
-      summary: `Parsed profile indicating key capabilities in ${detectedSkills.slice(0, 4).join(', ')}. Analyzed locally under default Enterprise Computer Core protocols.`,
-      experience: [
-        {
-          role: "Professional Practitioner",
-          company: "Earth Federation Workspace",
-          duration: "Recent Solar Cycles",
-          description: "Applied core technical, communication, and analytical skills to resolve real-world operations issues."
-        }
-      ],
-      education: [
-        {
-          degree: "Standard Qualifications",
-          school: "Starfleet Academy Preparatory",
-          year: "Stardate Equivalent"
-        }
-      ],
-      skills: detectedSkills
+      summary: summary,
+      experience: experience,
+      education: education,
+      skills: skills
     },
     star_trek_jobs: jobs
   };

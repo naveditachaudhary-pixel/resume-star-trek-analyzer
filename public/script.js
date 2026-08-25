@@ -233,8 +233,20 @@ document.addEventListener('DOMContentLoaded', () => {
   function renderResults() {
     if (!analysisResult) return;
 
-    // Tab 1: Render JSON
-    jsonCodeDisplay.textContent = JSON.stringify(analysisResult.resume_json, null, 2);
+    // Show/hide offline fallback warning banner
+    const fallbackBanner = document.getElementById('fallback-banner');
+    if (analysisResult.telemetry_meta) {
+      fallbackBanner.classList.remove('hidden');
+    } else {
+      fallbackBanner.classList.add('hidden');
+    }
+
+    // Tab 1: Render JSON (include telemetry metadata if in fallback mode)
+    const jsonOutput = { ...analysisResult.resume_json };
+    if (analysisResult.telemetry_meta) {
+      jsonOutput.telemetry_meta = analysisResult.telemetry_meta;
+    }
+    jsonCodeDisplay.textContent = JSON.stringify(jsonOutput, null, 2);
 
     // Tab 2: Render Job Cards
     jobsGridContainer.innerHTML = '';

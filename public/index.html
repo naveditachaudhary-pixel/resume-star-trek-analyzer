@@ -113,6 +113,15 @@
       <!-- View 3: Results View -->
       <section id="results-view" class="view-panel">
         
+        <!-- Offline Warning Banner -->
+        <div id="fallback-banner" class="alert-banner hidden">
+          <span class="alert-icon">⚠️</span>
+          <div class="alert-content">
+            <span class="alert-title">LOCAL OFFLINE MODE</span>
+            <span class="alert-desc">Running a local heuristics parser due to unconfigured API credentials. Parsing may be less accurate.</span>
+          </div>
+        </div>
+
         <!-- Segmented Tab Controller -->
         <div class="segmented-tabs">
           <button class="tab-btn active" data-tab="tab-json">
