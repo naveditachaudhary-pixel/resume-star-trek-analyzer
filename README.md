@@ -39,7 +39,7 @@ export GCP_PROJECT=your-project-id           # Vertex AI (uses your gcloud crede
 export GCP_LOCATION=us-central1              # optional, default us-central1
 ```
 
-Use the demo button in the app to try it with `sample_resume.pdf`, a fictional resume for Miles O'Brien. You can also call the API directly:
+Click **Run System Simulation** in the app to try it with `sample_resume.pdf`, a fictional resume for Miles O'Brien. You can also call the API directly:
 
 ```bash
 curl -F "resume=@sample_resume.pdf" http://localhost:3000/api/analyze
